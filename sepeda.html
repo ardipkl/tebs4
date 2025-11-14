@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scultura 400 Smart Diagnosis</title>
+<style>
+    body {
+        margin: 0;
+        font-family: "Poppins", sans-serif;
+        background: #0f0f0f; /* abu gelap */
+        color: #dcdcdc;
+    }
+
+    header {
+        text-align: center;
+        padding: 25px;
+        background: linear-gradient(to right, #1b5e20, #0f0f0f); /* hijau ke abu */
+        color: white;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        box-shadow: 0 0 15px rgba(0,255,0,0.25);
+    }
+
+    .container {
+        max-width: 900px;
+        margin: auto;
+        padding: 20px;
+    }
+
+    .card {
+        background: #151515;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #2ecc71; /* hijau */
+        box-shadow: 0 0 12px rgba(0,255,0,0.15);
+    }
+
+    .card h2 {
+        margin: 0 0 10px;
+        color: #2ecc71; /* hijau */
+    }
+
+    input {
+        width: 100%;
+        padding: 14px;
+        border-radius: 10px;
+        border: 1px solid #2ecc71;
+        background: #0d0d0d;
+        color: white;
+        margin-top: 10px;
+    }
+
+    button {
+        margin-top: 15px;
+        padding: 14px 20px;
+        width: 100%;
+        border: none;
+        background: #2ecc71;
+        color: black;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.3s;
+    }
+
+    button:hover {
+        background: #27ae60;
+        transform: scale(1.02);
+        box-shadow: 0 0 10px rgba(0,255,0,0.3);
+    }
+
+    .result {
+        margin-top: 20px;
+        background: #1a1a1a;
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 4px solid #2ecc71;
+    }
+</style>
+</head>
+
+<body>
+
+<header>Scultura 400 Smart Diagnosis System</header>
+
+<div class="container">
+    <div class="card">
+        <h2>Sistem Cerdas Perbaikan Road Bike</h2>
+        <p>Masukkan pertanyaan terkait kerusakan atau masalah pada Merida Scultura 400.</p>
+
+        <input id="userInput" placeholder="contoh: kenapa gear belakang berisik?">
+        <button onclick="diagnose()">Cari Jawaban</button>
+
+        <div id="result" class="result" style="display:none;"></div>
+    </div>
+</div>
+
+<script>
+/* ================================
+   DATASET SMART ANSWER
+=================================*/
+
+const dataset = [
+    { q: "rantai berisik", a: "Rantai berisik biasanya disebabkan kurang pelumasan, rantai kotor, atau tension tidak stabil. Solusi: bersihkan rantai, lumasi ulang, cek chainline."},
+    { q: "rem cakram bunyi", a: "Rem cakram mengeluarkan bunyi karena rotor kotor/berminyak atau kaliper tidak center. Solusi: bersihkan rotor dengan alkohol, lakukan reseat kaliper."},
+    { q: "gear belakang tidak presisi", a: "Penyebab utama: hanger RD bengkok, indexing shifter meleset, atau kabel aus. Solusi: luruskan hanger, set ulang tension kabel, cek limit screw."},
+    { q: "ban cepat habis", a: "Ban cepat habis biasanya karena tekanan angin kurang, gaya mengerem keras, atau kualitas kompon ban. Solusi: jaga PSI ideal di 90–110."},
+    { q: "crank bunyi saat dikayuh", a: "Crank bunyi dapat berasal dari bottom bracket longgar, pedal kering, atau baut crank kurang kencang."},
+    { q: "fork goyang", a: "Fork goyang indikasi headset longgar. Solusi: kencangkan top cap dan stem clamp secara berurutan."},
+    { q: "shifter berat", a: "Shifter berat disebabkan kabel berkarat atau housing kotor. Solusi: ganti kabel + housing, lumasi titik gesekan."},
+    { q: "rantai sering lepas", a: "Rantai lepas karena chainring aus, derailleur depan tidak center, atau panjang rantai tidak sesuai."}
+];
+
+/* ================================
+   TEXT PREPROCESSING
+=================================*/
+
+function preprocess(text) {
+    text = text.toLowerCase();
+    const stopwords = ["kenapa","mengapa","apa","yang","pada","di","dan","atau","saat","kok"];
+    let words = text.split(" ").filter(w => !stopwords.includes(w));
+
+    words = words.map(w => 
+        w.replace(/nya$/,"").replace(/kan$/,"").replace(/an$/,"")
+    );
+
+    return words.join(" ");
+}
+
+/* ================================
+   SIMILARITY CHECK
+=================================*/
+
+function similarity(a, b) {
+    const aWords = a.split(" ");
+    const bWords = b.split(" ");
+    const all = [...new Set([...aWords, ...bWords])];
+
+    let vecA = all.map(word => aWords.filter(w => w===word).length);
+    let vecB = all.map(word => bWords.filter(w => w===word).length);
+
+    let dot = vecA.reduce((sum, val, i) => sum + (val * vecB[i]), 0);
+    let magA = Math.sqrt(vecA.reduce((s,v)=>s+v*v,0));
+    let magB = Math.sqrt(vecB.reduce((s,v)=>s+v*v,0));
+
+    return dot / (magA * magB);
+}
+
+/* ================================
+   MAIN ENGINE
+=================================*/
+
+function diagnose() {
+    const input = document.getElementById("userInput").value;
+    if (!input.trim()) return;
+
+    const processed = preprocess(input);
+
+    let bestScore = 0;
+    let bestAnswer = "Maaf, saya tidak menemukan jawaban yang sesuai. Coba gunakan kata kunci lain.";
+
+    dataset.forEach(entry => {
+        const score = similarity(processed, preprocess(entry.q));
+        if (score > bestScore) {
+            bestScore = score;
+            bestAnswer = entry.a;
+        }
+    });
+
+    const resultBox = document.getElementById("result");
+    resultBox.style.display = "block";
+    resultBox.innerHTML = `<b>Jawaban:</b><br>${bestAnswer}`;
+}
+</script>
+
+</body>
+</html>
